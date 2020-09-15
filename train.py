@@ -1,9 +1,10 @@
 import json
 from nltk_utils import tokenize, stem, bag_of_words
 import numpy as np
-import torch
-import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+from model import NeuralNet
+import torch
+from torch import nn
 
 with open("intents.json", "r") as f:
     intents = json.load(f)
@@ -43,14 +44,42 @@ class ChatDataset(Dataset):
         self.x_data = X_train
         self.y_data = y_train
 
-    def __getitem__(self, item):
-        return self.x_data[idx], self.y_data[idx]
+    def __getitem__(self, index):
+        return self.x_data[index], self.y_data[index]
 
     def __len__(self):
         return self.n_samples
 
 
 batch_size = 8
+hidden_size = 8
+output_size = len(tags)
+input_size = len(all_words)
+learning_rate = 0.001
+num_epochs = 1000
 
 dataset = ChatDataset()
 train_loader = DataLoader(dataset=dataset, batch_size=batch_size, num_workers=2)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=output_size).to(device)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+for epoch in range(num_epochs):
+    for (words, labels) in train_loader:
+        words = words.to(device)
+
+        output = model(words)
+        loss = criterion(output, labels)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    if (epoch +1) % 100 == 0:
+        print(f"Epoch {epoch+1}/{num_epochs}, loss = {loss.item():.4f}")
+
+print(f"Final loss = {loss.item():.4f}")
+
